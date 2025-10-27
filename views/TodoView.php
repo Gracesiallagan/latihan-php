@@ -163,7 +163,7 @@
             <button class="btn btn-info btn-sm text-white"
               onclick="showDetail(
                 `<?= htmlspecialchars($todo['title'], ENT_QUOTES) ?>`,
-                `<?= nl2br(htmlspecialchars($todo['description'], ENT_QUOTES)) ?>`,
+                `<?= nl2br(htmlspecialchars($todo['description'] ?? '', ENT_QUOTES)) ?>`,
                 `<?= ($todo['is_finished'] === 't' || $todo['is_finished'] == 1) ? 'Selesai' : 'Belum Selesai' ?>`
               )">
               Detail
@@ -191,7 +191,8 @@
 <div class="modal fade" id="addTodo">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="POST" action="?page=create">
+      <!-- PERUBAHAN: action diganti ke index.php?page=create (path jelas) -->
+      <form method="POST" action="index.php?page=create">
         <div class="modal-header"><h5 class="modal-title">Tambah Todo</h5></div>
         <div class="modal-body">
           <label>Judul</label>
