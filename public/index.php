@@ -21,7 +21,7 @@ switch ($page) {
         $todoController->update();
         break;
 
-    case 'toggle': // ✅ diperbaiki: variabel sudah konsisten
+    case 'toggle':
         $todoController->toggle();
         break;
 
@@ -29,12 +29,15 @@ switch ($page) {
         $todoController->delete();
         break;
 
-    case 'detail': // ✅ untuk fitur detail (bisa popup nanti)
+    case 'detail':
         $todoController->detail();
         break;
 
+    case 'reorder':
+        $todoController->reorder();
+        break;
+
     default:
-        // jika page tidak dikenali, kembalikan ke index
         $todoController->index();
         break;
 }

@@ -111,6 +111,16 @@
     tbody tr:active {
       cursor: grabbing;
     }
+
+    /* Alert message */
+    .alert-custom {
+      border-radius: 10px;
+      animation: slideDown 0.3s ease;
+    }
+    @keyframes slideDown {
+      from {opacity: 0; transform: translateY(-10px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
   </style>
 </head>
 <body>
@@ -122,23 +132,77 @@
 
 <div class="container">
   <div class="card card-custom p-4">
+    
+    <!-- PERBAIKAN: Pesan notifikasi -->
+    <?php if (isset($_GET['msg'])): ?>
+      <?php if ($_GET['msg'] === 'duplicate'): ?>
+        <div class="alert alert-warning alert-dismissible fade show alert-custom" role="alert">
+          <strong>Peringatan!</strong> Judul todo sudah ada. Gunakan judul yang berbeda.
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <?php elseif ($_GET['msg'] === 'added'): ?>
+        <div class="alert alert-success alert-dismissible fade show alert-custom" role="alert">
+          <strong>Berhasil!</strong> Todo berhasil ditambahkan.
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <?php elseif ($_GET['msg'] === 'error'): ?>
+        <div class="alert alert-danger alert-dismissible fade show alert-custom" role="alert">
+          <strong>Error!</strong> Terjadi kesalahan saat menyimpan data.
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <?php endif; ?>
+    <?php endif; ?>
+
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="mb-0">Daftar Todo</h4>
       <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addTodo">+ Tambah Todo</button>
     </div>
 
-    <!-- Filter dan Pencarian -->
+    <!-- PERBAIKAN: Filter dan Pencarian dengan parameter yang benar -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-      <div>
-        <a href="?filter=all" class="btn btn-outline-dark btn-sm <?= ($_GET['filter'] ?? 'all')==='all'?'active':'' ?>">Semua</a>
-        <a href="?filter=pending" class="btn btn-outline-danger btn-sm <?= ($_GET['filter'] ?? '')==='pending'?'active':'' ?>">Belum</a>
-        <a href="?filter=done" class="btn btn-outline-success btn-sm <?= ($_GET['filter'] ?? '')==='done'?'active':'' ?>">Selesai</a>
+      <div class="filter-bar">
+        <a href="index.php?page=index&filter=all<?= !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
+           class="btn btn-outline-dark btn-sm <?= ($_GET['filter'] ?? 'all') === 'all' ? 'active' : '' ?>">
+           Semua
+        </a>
+
+        <a href="index.php?page=index&filter=pending<?= !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
+           class="btn btn-outline-danger btn-sm <?= ($_GET['filter'] ?? '') === 'pending' ? 'active' : '' ?>">
+           Belum
+        </a>
+
+        <a href="index.php?page=index&filter=done<?= !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
+           class="btn btn-outline-success btn-sm <?= ($_GET['filter'] ?? '') === 'done' ? 'active' : '' ?>">
+           Selesai
+        </a>
       </div>
+
+      <!-- PERBAIKAN: Form search mempertahankan filter -->
       <form method="get" class="d-flex">
+        <input type="hidden" name="page" value="index">
         <input type="hidden" name="filter" value="<?= htmlspecialchars($_GET['filter'] ?? 'all') ?>">
-        <input type="text" name="search" class="form-control me-2" placeholder="Cari todo..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
+        <input type="text" name="search" class="form-control me-2" placeholder="Cari judul, deskripsi, atau status..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" style="min-width: 250px;">
         <button class="btn btn-primary" type="submit">Cari</button>
+        <?php if (!empty($_GET['search'])): ?>
+          <a href="index.php?page=index&filter=<?= htmlspecialchars($_GET['filter'] ?? 'all') ?>" class="btn btn-secondary ms-2">Reset</a>
+        <?php endif; ?>
       </form>
+    </div>
+
+    <!-- Info filter aktif -->
+    <?php 
+    $filterText = 'Semua Todo';
+    if (($_GET['filter'] ?? 'all') === 'done') $filterText = 'Todo Selesai';
+    if (($_GET['filter'] ?? 'all') === 'pending') $filterText = 'Todo Belum Selesai';
+    ?>
+    <div class="mb-2">
+      <small class="text-muted">
+        Menampilkan: <strong><?= $filterText ?></strong>
+        <?php if (!empty($_GET['search'])): ?>
+          | Pencarian: <strong>"<?= htmlspecialchars($_GET['search']) ?>"</strong>
+        <?php endif; ?>
+        | Total: <strong><?= count($todos ?? []) ?></strong> todo
+      </small>
     </div>
 
     <!-- Tabel Todo -->
@@ -180,7 +244,13 @@
           </td>
         </tr>
       <?php endforeach; else: ?>
-        <tr><td colspan="3" class="text-center text-muted">Belum ada todo</td></tr>
+        <tr><td colspan="3" class="text-center text-muted">
+          <?php if (!empty($_GET['search'])): ?>
+            Tidak ada hasil untuk pencarian "<?= htmlspecialchars($_GET['search']) ?>"
+          <?php else: ?>
+            Belum ada todo
+          <?php endif; ?>
+        </td></tr>
       <?php endif; ?>
       </tbody>
     </table>
@@ -191,17 +261,18 @@
 <div class="modal fade" id="addTodo">
   <div class="modal-dialog">
     <div class="modal-content">
-      <!-- PERUBAHAN: action diganti ke index.php?page=create (path jelas) -->
-      <form method="POST" action="index.php?page=create">
+      <form method="POST" action="index.php?page=create" id="addForm">
         <div class="modal-header"><h5 class="modal-title">Tambah Todo</h5></div>
         <div class="modal-body">
-          <label>Judul</label>
-          <input name="title" class="form-control" required>
+          <label>Judul <span class="text-danger">*</span></label>
+          <input name="title" id="addTitle" class="form-control" required maxlength="255">
+          <small class="text-muted">Judul harus unik</small>
+          
           <label class="mt-2">Deskripsi</label>
-          <textarea name="description" class="form-control"></textarea>
+          <textarea name="description" class="form-control" rows="3"></textarea>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Batal</button>
           <button class="btn btn-primary" type="submit">Simpan</button>
         </div>
       </form>
@@ -217,10 +288,13 @@
         <input type="hidden" name="id" id="editId">
         <div class="modal-header"><h5 class="modal-title">Edit Todo</h5></div>
         <div class="modal-body">
-          <label>Judul</label>
-          <input name="title" id="editTitle" class="form-control" required>
+          <label>Judul <span class="text-danger">*</span></label>
+          <input name="title" id="editTitle" class="form-control" required maxlength="255">
+          <small class="text-muted">Judul harus unik</small>
+          
           <label class="mt-2">Deskripsi</label>
-          <textarea name="description" id="editDesc" class="form-control"></textarea>
+          <textarea name="description" id="editDesc" class="form-control" rows="3"></textarea>
+          
           <label class="mt-2">Status</label>
           <select name="is_finished" id="editStatus" class="form-select">
             <option value="0">Belum</option>
@@ -228,7 +302,7 @@
           </select>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Batal</button>
           <button type="submit" class="btn btn-primary">Update</button>
         </div>
       </form>
@@ -258,6 +332,16 @@
 <script>
 const editModal = new bootstrap.Modal(document.getElementById('editTodo'));
 const detailModal = new bootstrap.Modal(document.getElementById('detailTodo'));
+const addModal = new bootstrap.Modal(document.getElementById('addTodo'));
+
+// Auto hide alert setelah 5 detik
+setTimeout(() => {
+  const alerts = document.querySelectorAll('.alert');
+  alerts.forEach(alert => {
+    const bsAlert = new bootstrap.Alert(alert);
+    bsAlert.close();
+  });
+}, 5000);
 
 // === TOMBOL EDIT ===
 document.querySelectorAll('.btn-edit').forEach(btn => {
@@ -273,50 +357,74 @@ document.querySelectorAll('.btn-edit').forEach(btn => {
 // === SUBMIT EDIT FORM ===
 document.getElementById('editForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Menyimpan...';
+  
   const id = document.getElementById('editId').value;
-  const title = document.getElementById('editTitle').value;
-  const description = document.getElementById('editDesc').value;
+  const title = document.getElementById('editTitle').value.trim();
+  const description = document.getElementById('editDesc').value.trim();
   const is_finished = document.getElementById('editStatus').value;
 
   try {
     const res = await fetch('?page=update', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+      headers: {
+        'Content-Type': 'application/json', 
+        'X-Requested-With': 'XMLHttpRequest'
+      },
       body: JSON.stringify({id, title, description, is_finished})
     });
+    
     const data = await res.json();
 
     if (data.success) {
       const todo = data.todo;
       const row = document.querySelector(`tr[data-id="${id}"]`);
+      
       if (row) {
         // Update isi tabel secara realtime
         row.children[0].textContent = todo.title;
         row.children[1].innerHTML = (todo.is_finished === 't' || todo.is_finished == 1)
           ? '<span class="badge bg-success">Selesai</span>'
           : '<span class="badge bg-danger">Belum</span>';
+        
         // Update data di tombol ubah
         const editBtn = row.querySelector('.btn-edit');
         editBtn.dataset.title = todo.title;
         editBtn.dataset.desc = todo.description ?? '';
         editBtn.dataset.done = (todo.is_finished === 't' || todo.is_finished == 1) ? 1 : 0;
+        
         // Tambahkan efek visual
-        row.classList.add('updated');
-        setTimeout(() => row.classList.remove('updated'), 1500);
+        row.style.background = '#d4edda';
+        setTimeout(() => {
+          row.style.background = '';
+        }, 1500);
       }
+      
       editModal.hide();
+      
+      // Tampilkan notifikasi sukses
+      showNotification('Todo berhasil diperbarui!', 'success');
+      
     } else {
-      alert('Gagal memperbarui todo!');
+      alert(data.message || 'Gagal memperbarui todo!');
     }
   } catch (err) {
+    console.error(err);
     alert('Terjadi kesalahan koneksi!');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
   }
 });
 
 // === DETAIL MODAL ===
 function showDetail(title, desc, status){
   document.getElementById('detailTitle').textContent = title;
-  document.getElementById('detailDesc').innerHTML = desc || '<i>Tidak ada deskripsi</i>';
+  document.getElementById('detailDesc').innerHTML = desc || '<i class="text-muted">Tidak ada deskripsi</i>';
   const statusEl = document.getElementById('detailStatus');
   statusEl.textContent = status;
   statusEl.className = 'badge ' + (status === 'Selesai' ? 'bg-success' : 'bg-danger');
@@ -328,12 +436,48 @@ new Sortable(document.querySelector('#todoTable tbody'), {
   animation: 150,
   onEnd: function(){
     let order = [];
-    document.querySelectorAll('#todoTable tbody tr').forEach(tr => order.push(tr.dataset.id));
-    fetch('?page=reorder', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({order})
+    document.querySelectorAll('#todoTable tbody tr').forEach(tr => {
+      const id = tr.dataset.id;
+      if (id) order.push(id);
     });
+    
+    fetch('?page=reorder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({order})
+    }).then(res => res.json())
+      .then(data => {
+        if (data.status === 'ok') {
+          showNotification('Urutan berhasil disimpan!', 'info');
+        }
+      });
+  }
+});
+
+// Fungsi helper untuk notifikasi
+function showNotification(message, type = 'success') {
+  const alertDiv = document.createElement('div');
+  alertDiv.className = `alert alert-${type} alert-dismissible fade show alert-custom`;
+  alertDiv.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  `;
+  
+  const container = document.querySelector('.card-custom');
+  container.insertBefore(alertDiv, container.firstChild);
+  
+  setTimeout(() => {
+    const bsAlert = new bootstrap.Alert(alertDiv);
+    bsAlert.close();
+  }, 3000);
+}
+
+// Validasi form tambah sebelum submit
+document.getElementById('addForm').addEventListener('submit', function(e) {
+  const title = document.getElementById('addTitle').value.trim();
+  if (title === '') {
+    e.preventDefault();
+    alert('Judul tidak boleh kosong!');
   }
 });
 </script>

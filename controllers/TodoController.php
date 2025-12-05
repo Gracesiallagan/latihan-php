@@ -10,112 +10,148 @@ class TodoController
         $this->model = new TodoModel();
     }
 
-    // 🏠 Menampilkan semua todo
+    // ============================================================
+    // INDEX – tampilkan daftar todo + filter + search
+    // ============================================================
     public function index()
     {
         $filter = $_GET['filter'] ?? 'all';
         $search = $_GET['search'] ?? '';
+
         $todos = $this->model->getTodos($filter, $search);
         include(__DIR__ . '/../views/TodoView.php');
     }
 
-    // ➕ Tambah todo
+    // ============================================================
+    // CREATE – tambah baru
+    // ============================================================
     public function create()
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
             $title = trim($_POST['title'] ?? '');
             $description = trim($_POST['description'] ?? '');
-            $success = $this->model->createTodo($title, $description);
-            header('Location: index.php?msg=' . ($success ? 'added' : 'duplicate'));
-            exit;
-        }
-        header('Location: index.php');
-        exit;
-    }
 
-    // ✏️ Update todo (form biasa atau AJAX)
-    public function update()
-    {
-        // === Jika dari fetch() (AJAX) ===
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-            header('Content-Type: application/json');
-
-            $data = json_decode(file_get_contents('php://input'), true);
-            $id = $data['id'] ?? null;
-            $title = trim($data['title'] ?? '');
-            $description = trim($data['description'] ?? '');
-            $is_finished = isset($data['is_finished']) ? (int)$data['is_finished'] : 0;
-
-            if (!empty($id) && $title !== '') {
-                $updated = $this->model->updateTodo($id, $title, $description, $is_finished);
-                $todo = $this->model->getTodoById($id);
-
-                // Pastikan balikan JSON lengkap untuk JS
-                echo json_encode([
-                    'success' => true,
-                    'todo' => [
-                        'id' => $todo['id'],
-                        'title' => $todo['title'],
-                        'description' => $todo['description'],
-                        'is_finished' => $todo['is_finished']
-                    ]
-                ]);
+            // Validasi judul tidak boleh kosong
+            if (empty($title)) {
+                header('Location: index.php?msg=empty');
                 exit;
             }
 
-            echo json_encode(['success' => false, 'message' => 'Invalid input']);
-            exit;
-        }
-
-        // === Jika dari form biasa (non-AJAX) ===
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $id = $_POST['id'] ?? null;
-            $title = trim($_POST['title'] ?? '');
-            $description = trim($_POST['description'] ?? '');
-            $is_finished = isset($_POST['is_finished']) ? (int)$_POST['is_finished'] : 0;
-
-            if (!empty($id) && $title !== '') {
-                $this->model->updateTodo($id, $title, $description, $is_finished);
+            // Cek duplikat judul
+            if ($this->model->existsTitle($title)) {
+                header('Location: index.php?msg=duplicate');
+                exit;
             }
+
+            $success = $this->model->createTodo($title, $description);
+
+            header('Location: index.php?msg=' . ($success ? 'added' : 'error'));
+            exit;
         }
 
         header('Location: index.php');
         exit;
     }
 
-    // 🔁 Toggle status
+    // ============================================================
+    // UPDATE – mendukung form biasa atau AJAX
+    // ============================================================
+    public function update()
+    {
+        // === AJAX ===
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+
+            header('Content-Type: application/json');
+            $data = json_decode(file_get_contents("php://input"), true);
+
+            $id = $data['id'] ?? null;
+            $title = trim($data['title'] ?? '');
+            $description = trim($data['description'] ?? '');
+            $is_finished = $data['is_finished'] ?? 0;
+
+            if (empty($id) || $title === '') {
+                echo json_encode(['success' => false, 'message' => 'Invalid input']);
+                exit;
+            }
+
+            // Validasi duplikat judul (kecuali untuk todo yang sedang diedit)
+            if ($this->model->existsTitleExcept($title, $id)) {
+                echo json_encode(['success' => false, 'message' => 'Judul sudah digunakan!']);
+                exit;
+            }
+
+            $this->model->updateTodo($id, $title, $description, $is_finished);
+            $todo = $this->model->getTodoById($id);
+
+            echo json_encode([
+                'success' => true,
+                'todo' => $todo
+            ]);
+            exit;
+        }
+
+        // === FORM BIASA ===
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+            $id = $_POST['id'] ?? null;
+            $title = trim($_POST['title'] ?? '');
+            $description = trim($_POST['description'] ?? '');
+            $is_finished = $_POST['is_finished'] ?? 0;
+
+            // Validasi duplikat judul
+            if ($this->model->existsTitleExcept($title, $id)) {
+                header('Location: index.php?msg=duplicate');
+                exit;
+            }
+
+            $this->model->updateTodo($id, $title, $description, $is_finished);
+        }
+
+        header('Location: index.php');
+        exit;
+    }
+
+    // ============================================================
+    // TOGGLE
+    // ============================================================
     public function toggle()
     {
         if (isset($_GET['id'])) {
-            $id = (int)$_GET['id'];
-            $this->model->toggleStatus($id);
+            $this->model->toggleStatus((int)$_GET['id']);
         }
         header("Location: index.php");
         exit;
     }
 
-    // ❌ Hapus
+    // ============================================================
+    // DELETE
+    // ============================================================
     public function delete()
     {
         if (isset($_GET['id'])) {
-            $id = (int)$_GET['id'];
-            $this->model->deleteTodo($id);
+            $this->model->deleteTodo((int)$_GET['id']);
         }
         header('Location: index.php');
         exit;
     }
 
-    // 🔀 Reorder (drag & drop)
+    // ============================================================
+    // REORDER DRAG & DROP
+    // ============================================================
     public function reorder()
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
             header('Content-Type: application/json');
             $data = json_decode(file_get_contents('php://input'), true);
+
             if (!empty($data['order']) && is_array($data['order'])) {
                 $this->model->updateOrder($data['order']);
                 echo json_encode(['status' => 'ok']);
                 exit;
             }
+
             http_response_code(400);
             echo json_encode(['status' => 'bad_request']);
             exit;
@@ -126,7 +162,9 @@ class TodoController
         exit;
     }
 
-    // 🔍 Detail
+    // ============================================================
+    // DETAIL PAGE
+    // ============================================================
     public function detail()
     {
         if (!isset($_GET['id'])) {
@@ -134,13 +172,9 @@ class TodoController
             exit;
         }
 
-        $id = (int)$_GET['id'];
-        $todo = $this->model->getTodoById($id);
+        $todo = $this->model->getTodoById((int)$_GET['id']);
         include(__DIR__ . '/../views/TodoDetailView.php');
         exit;
     }
 }
 ?>
-
-
-
