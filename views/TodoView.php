@@ -181,7 +181,7 @@
       <form method="get" class="d-flex">
         <input type="hidden" name="page" value="index">
         <input type="hidden" name="filter" value="<?= htmlspecialchars($_GET['filter'] ?? 'all') ?>">
-        <input type="text" name="search" class="form-control me-2" placeholder="Cari judul, deskripsi, atau status..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" style="min-width: 250px;">
+        <input type="text" name="search" class="form-control me-2" placeholder="Cari " value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" style="min-width: 250px;">
         <button class="btn btn-primary" type="submit">Cari</button>
         <?php if (!empty($_GET['search'])): ?>
           <a href="index.php?page=index&filter=<?= htmlspecialchars($_GET['filter'] ?? 'all') ?>" class="btn btn-secondary ms-2">Reset</a>
